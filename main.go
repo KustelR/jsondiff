@@ -33,32 +33,46 @@ func getTokens(source []byte) JsonEntry {
 }
 
 	srcLen := len(source)
-	tgtLen := len(target)
-	if srcLen != tgtLen {
-		panic("different length not supported")
-	}
-	srcTokens := getTokens(source)
-	tgtTokens := getTokens(target)
-	new := make([]byte, tgtLen)
-	old := make([]byte, srcLen)
-	var identifier []byte
-	for idx, srcToken := range srcTokens {
-		tgtToken := tgtTokens[idx]
-		isSame := compareTokens(srcToken, tgtToken)
-		fmt.Println(isSame, "id:", string(identifier), "values:", string(srcToken), string(tgtToken))
-		if identifier != nil {
-			if isSame {
-				identifier = nil
-				continue
-			}
-			new = pushEntry(new, identifier, srcToken)
-			old = pushEntry(old, identifier, srcToken)
-			identifier = nil
+	last := 0
+	for idx := 1; idx < srcLen; idx++ {
+		if idx >= last {
 
+		}
+		char := source[idx]
+		if char == ']' {
+			return JsonEntry{ARRAY, last, nil, nil, &tokens, nil}
+		}
+
+		tokenData := getTokens(source[idx:])
+		tokens = append(tokens, tokenData)
+		idx += tokenData.length
+		last = idx
+	}
+	return JsonEntry{ARRAY, last, nil, nil, &tokens, nil}
+}
+
+func getObject(source []byte) JsonEntry {
+	last := 0
+	srcLen := len(source)
+	tokens := make([]JsonEntry, 0)
+	keys := make([]JsonEntry, 0)
+	values := make([]JsonEntry, 0)
+	for idx := 1; idx < srcLen; idx++ {
+		tokenData := getTokens(source[idx:])
+		tokens = append(tokens, tokenData)
+		idx += tokenData.length
+		last = idx
+	}
+	for idx, tkn := range tokens {
+		if idx%2 == 0 {
+			keys = append(keys, tkn)
 		} else {
-			if isSame {
-				identifier = srcToken
-			}
+			values = append(values, tkn)
+		}
+	}
+	return JsonEntry{OBJECT, last, &keys, &values, nil, nil}
+}
+
 		}
 	}
 	return new, old
