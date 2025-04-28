@@ -3,13 +3,45 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-)
+type JsonEntry struct {
+	jsonType     int
+	length       int
+	ObjectKeys   *[]JsonEntry
+	ObjectValues *[]JsonEntry
+	Array        *[]JsonEntry
+	Value        *[]byte
+}
 
-/*
-	[WIP]!
-
-Finds difference between two JSONs and returns two new, first containing entries missing from target, and second - lines missing from source
-*/
+func (je JsonEntry) String() string {
+	result := ""
+	switch je.jsonType {
+	case VALUE:
+		result += string(*je.Value)
+	case OBJECT:
+		result += "{"
+		for idx, key := range *je.ObjectKeys {
+			if idx != 0 {
+				result += ","
+			}
+			val := (*je.ObjectValues)[idx]
+			result += key.String()
+			result += ":"
+			result += val.String()
+		}
+		result += "}"
+	case ARRAY:
+		result += "["
+		for idx, val := range *je.Array {
+			//fmt.Println(idx, val)
+			if idx != 0 {
+				result += ","
+			}
+			result += val.String()
+		}
+		result += "]"
+	}
+	return result
+}
 func Diff(source []byte, target []byte) ([]byte, []byte) {
 	added := make([]byte, 0)
 	deleted := make([]byte, 0)
