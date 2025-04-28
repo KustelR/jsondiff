@@ -58,49 +58,6 @@ func pushEntry(dest []byte, identifier []byte, value []byte) []byte {
 	return dest
 }
 
-/*
-Returns an array of tokens from JSON source
-*/
-func getTokens(source []byte) [][]byte {
-	srcLen := len(source)
-	result := make([][]byte, 0)
-	for idx := 0; idx < srcLen; idx++ {
-		data := source[idx]
-		if data == 34 {
-			token, length := readToken(source[idx:])
-			idx += length
-			result = append(result, token)
-		}
-	}
-	return result
-}
-
-/*
-	[WIP]!
-
-Finds first token in given slice.
-*/
-func readToken(source []byte) ([]byte, int) {
-	for idx, data := range source[1:] {
-		if data == 34 {
-			return source[:idx+2], idx + 2
-		}
-	}
-	return source, -1
-}
-
-func compareTokens(source []byte, target []byte) bool {
-	if len(source) != len(target) {
-		return false
-	}
-	for idx, data := range source {
-		if data != target[idx] {
-			return false
-		}
-	}
-	return true
-}
-
 type smth struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
