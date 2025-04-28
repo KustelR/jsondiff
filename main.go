@@ -3,6 +3,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+)
+
+var TokenEnders = [4]string{":", ",", "}", "]"}
+var TokenMods = [2]string{"{", "["}
+
+const (
+	VALUE  = iota
+	OBJECT = iota
+	ARRAY  = iota
+)
+
 type JsonEntry struct {
 	jsonType     int
 	length       int
@@ -64,6 +76,8 @@ func getTokens(source []byte) JsonEntry {
 	}
 }
 
+func getArray(source []byte) JsonEntry {
+	tokens := make([]JsonEntry, 0)
 	srcLen := len(source)
 	last := 0
 	for idx := 1; idx < srcLen; idx++ {
@@ -105,9 +119,17 @@ func getObject(source []byte) JsonEntry {
 	return JsonEntry{OBJECT, last, &keys, &values, nil, nil}
 }
 
+func getToken(source []byte) []byte {
+	for idx, b := range source {
+		if slices.Contains(TokenEnders[:], string(b)) {
+			fmt.Println(string(b))
+			if b == ']' {
+			}
+			fmt.Println(source[:idx])
+			return source[:idx]
 		}
 	}
-	return new, old
+	return source
 }
 
 /*
@@ -147,6 +169,7 @@ func main() {
 		make([]string, 0),
 	}
 	item1.Beliefs = append(item1.Beliefs, "noodle monster")
+	item1.Beliefs = append(item1.Beliefs, "jesus christ")
 	item2.Beliefs = append(item2.Beliefs, "noodle monster")
 	json1, err := json.Marshal(item1)
 	if err != nil {
@@ -159,5 +182,5 @@ func main() {
 	old, newer := Diff(json1, json2)
 	fmt.Println(string(newer))
 	fmt.Println(string(old))
-	fmt.Println(string(json1), string(json2))
+	//fmt.Println(string(json1), string(json2))
 }
