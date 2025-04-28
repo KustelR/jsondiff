@@ -11,6 +11,27 @@ import (
 Finds difference between two JSONs and returns two new, first containing entries missing from target, and second - lines missing from source
 */
 func Diff(source []byte, target []byte) ([]byte, []byte) {
+	added := make([]byte, 0)
+	deleted := make([]byte, 0)
+	srcTokens := getTokens(source)
+	fmt.Println(srcTokens)
+	return added, deleted
+}
+
+func getTokens(source []byte) JsonEntry {
+	first := source[0]
+	var jsonType int
+	switch first {
+	case '{':
+		return getObject(source)
+	case '[':
+		return getArray(source)
+	default:
+		value := getToken(source)
+		return JsonEntry{jsonType, len(value), nil, nil, nil, &value}
+	}
+}
+
 	srcLen := len(source)
 	tgtLen := len(target)
 	if srcLen != tgtLen {
