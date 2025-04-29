@@ -1,7 +1,6 @@
 package jsondiff
 
 import (
-	"fmt"
 	"slices"
 )
 
@@ -126,7 +125,6 @@ func halfDiffArray(source *jsonEntry, target *jsonEntry) []byte {
 }
 
 func halfDiffObject(source *jsonEntry, target *jsonEntry) []byte {
-	fmt.Println(source)
 	result := make([]byte, 0)
 
 	forAppend := make([][2]*jsonEntry, 0)
