@@ -24,7 +24,51 @@ type JsonEntry struct {
 	Value        *[]byte
 }
 
-func (je JsonEntry) String() string {
+func (first *jsonEntry) Equal(other *jsonEntry) (bool, error) {
+	if first.jsonType != other.jsonType {
+		return false, nil
+	}
+	switch first.jsonType {
+	case ARRAY:
+		if len(*first.Array) != len(*other.Array) {
+			return false, nil
+		}
+		for idx, val := range *first.Array {
+			isEqual, err := val.Equal(&(*other.Array)[idx])
+			if err != nil {
+				return false, err
+			}
+			if !isEqual {
+				return false, nil
+			}
+		}
+		return true, nil
+	case OBJECT:
+		if (len(*first.ObjectValues)) >= len(*other.ObjectKeys) {
+			return false, nil
+		}
+		for idx, key := range *first.ObjectKeys {
+			isEqual, err := key.Equal(&(*other.ObjectKeys)[idx])
+			if err != nil {
+				return false, err
+			}
+			if !isEqual {
+				return false, nil
+			}
+			isEqual, err = (*first.ObjectValues)[idx].Equal(&(*other.ObjectValues)[idx])
+			if err != nil {
+				return false, err
+			}
+			if !isEqual {
+				return false, nil
+			}
+		}
+		return true, nil
+	default:
+		return slices.Equal(*first.Value, *other.Value), nil
+	}
+}
+
 	result := ""
 	switch je.jsonType {
 	case VALUE:
