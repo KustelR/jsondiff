@@ -130,12 +130,12 @@ func halfDiffObject(source *jsonEntry, target *jsonEntry) []byte {
 	forAppend := make([][2]*jsonEntry, 0)
 	for idx, key := range *target.ObjectKeys {
 		isMatched := false
-		for idxTgt, keyTgt := range *source.ObjectKeys {
-			isKeyMatch, _ := key.Equal(&keyTgt)
+		for idxSrc, keySrc := range *source.ObjectKeys {
+			isKeyMatch, _ := key.Equal(&keySrc)
 			if !isKeyMatch {
-				break
+				continue
 			}
-			isMatched, _ = (*target.ObjectValues)[idx].Equal(&(*source.ObjectValues)[idxTgt])
+			isMatched, _ = (*target.ObjectValues)[idx].Equal(&(*source.ObjectValues)[idxSrc])
 		}
 		if !isMatched {
 			forAppend = append(forAppend, [2]*jsonEntry{&key, &(*source.ObjectValues)[idx]})
