@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 )
 
-var TokenEnders = [4]string{":", ",", "}", "]"}
-var TokenMods = [2]string{"{", "["}
+var TokenEnders = [4]byte{':', ',', '}', ']'}
+var TokenMods = [2]byte{'{', '['}
 
 const (
 	VALUE  = iota
@@ -15,12 +14,12 @@ const (
 	ARRAY  = iota
 )
 
-type JsonEntry struct {
+type jsonEntry struct {
 	jsonType     int
 	length       int
-	ObjectKeys   *[]JsonEntry
-	ObjectValues *[]JsonEntry
-	Array        *[]JsonEntry
+	ObjectKeys   *[]jsonEntry
+	ObjectValues *[]jsonEntry
+	Array        *[]jsonEntry
 	Value        *[]byte
 }
 
@@ -69,6 +68,7 @@ func (first *jsonEntry) Equal(other *jsonEntry) (bool, error) {
 	}
 }
 
+func (je jsonEntry) String() string {
 	result := ""
 	switch je.jsonType {
 	case VALUE:
@@ -88,7 +88,6 @@ func (first *jsonEntry) Equal(other *jsonEntry) (bool, error) {
 	case ARRAY:
 		result += "["
 		for idx, val := range *je.Array {
-			//fmt.Println(idx, val)
 			if idx != 0 {
 				result += ","
 			}
@@ -98,15 +97,106 @@ func (first *jsonEntry) Equal(other *jsonEntry) (bool, error) {
 	}
 	return result
 }
+
+func halfDiffArray(source *jsonEntry, target *jsonEntry) []byte {
+	result := make([]byte, 0)
+	forAppend := make([]*jsonEntry, 0)
+	for _, val := range *target.Array {
+		isMatched := false
+		for _, valTgt := range *source.Array {
+
+			isMatched, _ = val.Equal(&valTgt)
+		}
+		if !isMatched {
+			forAppend = append(forAppend, &val)
+		}
+	}
+	if (len(forAppend)) <= 0 {
+		return result
+	}
+	result = append(result, '[')
+	for idx, val := range forAppend {
+		if idx != 0 {
+			result = append(result, ',')
+		}
+		result = append(result, []byte(val.String())...)
+	}
+	result = append(result, ']')
+	return result
+}
+
+func halfDiffObject(source *jsonEntry, target *jsonEntry) []byte {
+	fmt.Println(source)
+	result := make([]byte, 0)
+
+	forAppend := make([][2]*jsonEntry, 0)
+	for idx, key := range *target.ObjectKeys {
+		isMatched := false
+		for idxTgt, keyTgt := range *source.ObjectKeys {
+			isKeyMatch, _ := key.Equal(&keyTgt)
+			if !isKeyMatch {
+				break
+			}
+			isMatched, _ = (*target.ObjectValues)[idx].Equal(&(*source.ObjectValues)[idxTgt])
+		}
+		if !isMatched {
+			forAppend = append(forAppend, [2]*jsonEntry{&key, &(*source.ObjectValues)[idx]})
+		}
+
+	}
+	if (len(forAppend)) <= 0 {
+		return result
+	}
+	result = append(result, '{')
+	for idx := range forAppend {
+		if idx != 0 {
+			result = append(result, ',')
+		}
+		result = append(result, []byte(forAppend[idx][0].String())...)
+		result = append(result, ':')
+		result = append(result, []byte(forAppend[idx][1].String())...)
+	}
+	result = append(result, '}')
+
+	return result
+}
+
 func Diff(source []byte, target []byte) ([]byte, []byte) {
 	added := make([]byte, 0)
 	deleted := make([]byte, 0)
 	srcTokens := getTokens(source)
-	fmt.Println(srcTokens)
+	tgtTokens := getTokens(target)
+
+	if srcTokens.jsonType != tgtTokens.jsonType {
+		return source, target
+	}
+	switch srcTokens.jsonType {
+	case OBJECT:
+		objAdded := halfDiffObject(&srcTokens, &tgtTokens)
+		objDeleted := halfDiffObject(&tgtTokens, &srcTokens)
+		added = append(added, objAdded...)
+		deleted = append(deleted, objDeleted...)
+	case ARRAY:
+		arrAdded := halfDiffArray(&srcTokens, &tgtTokens)
+		arrDeleted := halfDiffArray(&tgtTokens, &srcTokens)
+
+		added = append(added, arrAdded...)
+		deleted = append(deleted, arrDeleted...)
+	default:
+		isEqual, err := srcTokens.Equal(&tgtTokens)
+		if err != nil {
+			panic(err)
+		}
+		if !isEqual {
+			added = append(added, source...)
+			deleted = append(deleted, target...)
+		}
+	}
+
 	return added, deleted
 }
 
-func getTokens(source []byte) JsonEntry {
+func getTokens(source []byte) jsonEntry {
 	first := source[0]
 	var jsonType int
 	switch first {
@@ -116,42 +206,51 @@ func getTokens(source []byte) JsonEntry {
 		return getArray(source)
 	default:
 		value := getToken(source)
-		return JsonEntry{jsonType, len(value), nil, nil, nil, &value}
+		return jsonEntry{jsonType, len(value), nil, nil, nil, &value}
 	}
 }
 
-func getArray(source []byte) JsonEntry {
-	tokens := make([]JsonEntry, 0)
-	srcLen := len(source)
+func getArray(source []byte) jsonEntry {
+	tokens := make([]jsonEntry, 0)
 	last := 0
-	for idx := 1; idx < srcLen; idx++ {
-		if idx >= last {
-
+	for idx, b := range source {
+		if b == ']' {
+			last = idx
+			break
 		}
+	}
+	for idx := 1; idx < last; idx++ {
 		char := source[idx]
-		if char == ']' {
-			return JsonEntry{ARRAY, last, nil, nil, &tokens, nil}
+		if char == ',' {
+			continue
 		}
-
 		tokenData := getTokens(source[idx:])
 		tokens = append(tokens, tokenData)
 		idx += tokenData.length
-		last = idx
 	}
-	return JsonEntry{ARRAY, last, nil, nil, &tokens, nil}
+	return jsonEntry{ARRAY, last, nil, nil, &tokens, nil}
 }
 
-func getObject(source []byte) JsonEntry {
+func getObject(source []byte) jsonEntry {
+	tokens := make([]jsonEntry, 0)
+	keys := make([]jsonEntry, 0)
+	values := make([]jsonEntry, 0)
+
 	last := 0
-	srcLen := len(source)
-	tokens := make([]JsonEntry, 0)
-	keys := make([]JsonEntry, 0)
-	values := make([]JsonEntry, 0)
-	for idx := 1; idx < srcLen; idx++ {
+	for idx, b := range source {
+		if b == '}' {
+			last = idx
+			break
+		}
+	}
+	for idx := 1; idx < last; idx++ {
+		char := source[idx]
+		if char == ',' {
+			continue
+		}
 		tokenData := getTokens(source[idx:])
 		tokens = append(tokens, tokenData)
 		idx += tokenData.length
-		last = idx
 	}
 	for idx, tkn := range tokens {
 		if idx%2 == 0 {
@@ -160,65 +259,14 @@ func getObject(source []byte) JsonEntry {
 			values = append(values, tkn)
 		}
 	}
-	return JsonEntry{OBJECT, last, &keys, &values, nil, nil}
+	return jsonEntry{OBJECT, last, &keys, &values, nil, nil}
 }
 
 func getToken(source []byte) []byte {
 	for idx, b := range source {
-		if slices.Contains(TokenEnders[:], string(b)) {
+		if slices.Contains(TokenEnders[:], b) {
 			return source[:idx]
 		}
 	}
 	return source
-}
-
-/*
-Pushes identifier and value to dest
-*/
-func pushEntry(dest []byte, identifier []byte, value []byte) []byte {
-
-	idCopy := make([]byte, len(identifier))
-	valueCopy := make([]byte, len(value))
-	copy(idCopy, identifier)
-	copy(valueCopy, value)
-	dest = append(dest, idCopy...)
-	dest = append(dest, valueCopy...)
-
-	return dest
-}
-
-type smth struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Eatable     bool     `json:"eatable"`
-	Beliefs     []string `json:"beliefs"`
-}
-
-func main() {
-	item1 := smth{
-		"john",
-		"humans",
-		true,
-		make([]string, 0),
-	}
-
-	item2 := smth{
-		"jown",
-		"humane",
-		true,
-		make([]string, 0),
-	}
-	item1.Beliefs = append(item1.Beliefs, "noodle monster")
-	item2.Beliefs = append(item2.Beliefs, "noodle monster")
-	json1, err := json.Marshal(item1)
-	if err != nil {
-		panic(err)
-	}
-	json2, err := json.Marshal(item2)
-	if err != nil {
-		panic(err)
-	}
-	old, newer := Diff(json1, json2)
-	fmt.Println(string(newer))
-	fmt.Println(string(old))
 }
